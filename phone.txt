@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ILOVEYOURSCREAM-Demo - Mobile Supported</title>
+    <style>
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            background: black; overflow: hidden; touch-action: none; /* 防止手機拖動頁面 */
+            font-family: "MingLiU", "PMingLiU", "細明體", serif; 
+        }
+        
+        #start-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            z-index: 9999; background: black; color: white; 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+            cursor: pointer; text-align: center; line-height: 2;
+        }
+
+        #game-container { 
+            width: 100%; height: 100vh; 
+            background-color: black; background-size: cover; background-position: center 100%; 
+            position: relative; display: flex; justify-content: center; 
+            transition: background-position 4s ease-in-out;
+        }
+
+        #flashlight-canvas {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1000; pointer-events: none; display: none; 
+        }
+
+        #dialog-box {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            width: 90%; height: 160px; padding: 20px; 
+            background: rgba(0, 0, 0, 0.85); border: 1px solid white; 
+            color: white; z-index: 2000; cursor: pointer; display: none;
+            box-sizing: border-box; overflow-y: auto;
+        }
+
+        #speaker { font-weight: bold; color: #ff3333; margin-bottom: 10px; font-size: 20px; }
+        #content { font-size: 22px; line-height: 1.4; letter-spacing: 1px; }
+
+        #body-hook {
+            position: absolute; top: -60px; width: 280px; /* 手機版縮小一點點 */
+            transform-origin: top center; z-index: 800;
+            display: none; opacity: 1;
+        }
+        #body-hook img { width: 100%; height: auto; -webkit-user-drag: none; }
+
+        @keyframes eerieSway {
+            0% { transform: rotate(0deg); }
+            20% { transform: rotate(-8deg); } 
+            50% { transform: rotate(6deg); }   
+            100% { transform: rotate(0deg); }
+        }
+        .swaying { animation: eerieSway 5s ease-in-out forwards; }
+        .scary-word { color: #ff3333; font-weight: bold; display: inline-block; animation: textShake 0.1s infinite; }
+        .text-shaking { display: inline-block; animation: textShake 0.1s infinite; }
+        @keyframes textShake { 0% { transform: translate(0,0); } 50% { transform: translate(-1px,1px); } 100% { transform: translate(0,0); } }
+    </style>
+</head>
+<body>
+
+    <div id="start-overlay">
+        <div style="font-size: 18px; margin-bottom: 30px; text-align: center; padding: 0 20px;">
+            我是Fok 作者這個是Demo 用AI編程 我自己整嚟爽 👅👅<br>
+            好爽 CS堂繼續諗
+        </div>
+        <div style="font-size: 24px; letter-spacing: 5px; border: 1px solid white; padding: 10px 30px;">[ 點擊開始遊戲 ]</div>
+    </div>
+
+    <div id="game-container">
+        <canvas id="flashlight-canvas"></canvas>
+        <div id="body-hook"><img src="2033.png"></div>
+        <div id="dialog-box" onclick="handleFlow()">
+            <div id="speaker"></div>
+            <div id="content"></div>
+        </div>
+    </div>
+
+<script>
+    const bgm = new Audio('bgm.mp3'); bgm.loop = true;
+    const sfx = new Audio();
+    const creakSfx = new Audio('creak.mp3');
+    const canvas = document.getElementById('flashlight-canvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('game-container');
+    const hook = document.getElementById('body-hook');
+    const box = document.getElementById('dialog-box');
+    const contentField = document.getElementById('content');
+    const speakerField = document.getElementById('speaker');
+
+    const story = [
+        { n: "我", t: "【...】" },
+        { n: "我", t: "【這裡是哪裡？】" },
+        { n: "我", t: "我看看身處的環境處於學校的大門，回頭看了一轉發覺並無一人。" },
+        { n: "我", t: "【這麼奇怪..仆街我屌你老母！！！】" },
+        { n: "？", t: "【啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊】", s: "scream.mp3" },
+        { n: "？", t: "<span class='scary-word'>你這個畜生</span><span class='scary-word'>去死！去死!去死!去死!去死!</span>", s: "chainsaw.mp3" },
+        { n: "我", t: "那個是什麼？！為什麼會有電鋸聲？" },
+        { n: "我", t: "沒有想多一秒我馬上抬起雙腿嘗試逃離這個地方", blackout: true, shake: true },
+        { n: "我", t: "我腦袋一片空白只想着找到最近的出口", blackout: true, shake: true },
+        { n: "我", t: "對於未知的恐懼之下，五官的感受無限被放大，腎上腺素飆升。", blackout: true, shake: true },
+        { n: "我", t: "我管不上回頭看看周圍的環境只管著向前跑嘗試逃離這個鬼地方，感覺電鋸的聲音離我越來越近...", blackout: true, shake: true, s: "chainsaw.mp3" },
+        { n: "我", t: "在某一個轉角位後，映入眼簾的是一間沒有關門的課室。", blackout: true },
+        { n: "我", t: "來不切多想，我馬上進到課室關上門", blackout: true, s: "door_close.mp3", stopBGM: true },
+        { n: "我", t: "我大口喘着氣嘗試平復呼吸", blackout: true },
+        { n: "我", t: "冷靜過後，我才恍然大悟，用手蓋着自己的嘴，以免被外面的人發現", blackout: true },
+        { n: "我", t: "我緊咬着嘴唇貼在冰冷的鐵門上嘗試聆聽出面的動靜", blackout: true },
+        { n: "我", t: "…..", blackout: true },
+        { n: "我", t: "沒有任何聲…", blackout: true },
+        { n: "我", t: "腳步呼吸完全沒有，反而令人覺得奇怪…", blackout: true },
+        { n: "我", t: "剛才的尖叫聲雖然不是很近，但是還是有一段的距離。", blackout: true },
+        { n: "我", t: "<span class='scary-word'>我回想起剛才的電鋸聲以及尖叫不禁感到毛骨悚然</span>", blackout: true },
+        { n: "我", t: "… ", blackout: true },
+        { n: "我", t: "有點不對勁…", blackout: true, shake: true },
+        { n: "我", t: "<span class='scary-word'>怎麼有一絲血腥味？</span>", blackout: true }
+    ];
+
+    let currentIndex = -1, isTyping = false, isInteractive = false, interactionCount = 0;
+    let mouseX = window.innerWidth / 2, mouseY = window.innerHeight / 2;
+    let isFlashlightOn = false, eventTriggered = false;
+    let typingTimer = null;
+
+    function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function startTyping(name, text, isShake = false) {
+        if (typingTimer) clearInterval(typingTimer);
+        isTyping = true;
+        speakerField.innerText = name;
+        contentField.className = isShake ? "text-shaking" : "";
+        contentField.innerHTML = "";
+        if (text.includes("<span")) { contentField.innerHTML = text; isTyping = false; }
+        else {
+            let i = 0;
+            typingTimer = setInterval(() => {
+                if (i < text.length) { contentField.innerHTML += text.charAt(i); i++; }
+                else { clearInterval(typingTimer); isTyping = false; }
+            }, 50);
+        }
+    }
+
+    function drawFlashlight() {
+        if (!isFlashlightOn) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const grad = ctx.createRadialGradient(mouseX, mouseY, 30, mouseX, mouseY, 200);
+        grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(mouseX, mouseY, 200, 0, Math.PI * 2); ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+        
+        if (hook.style.display === "block") checkCollision();
+        requestAnimationFrame(drawFlashlight);
+    }
+
+    function checkCollision() {
+        if (eventTriggered) return;
+        const rect = hook.getBoundingClientRect();
+        // 稍微放大手機版的判定範圍，因為手指觸控較不準確
+        const padding = 20;
+        if (mouseX > rect.left - padding && mouseX < rect.right + padding && mouseY > rect.top - padding && mouseY < rect.bottom + padding) {
+            triggerJumpScare();
+        }
+    }
+
+    // 統一處理滑鼠與觸控座標
+    function handleMove(e) {
+        let clientX, clientY;
+        if (e.touches) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+        mouseX = clientX;
+        mouseY = clientY;
+    }
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('touchmove', (e) => {
+        handleMove(e);
+        e.preventDefault(); // 防止觸控時捲動頁面
+    }, { passive: false });
+
+    document.getElementById('start-overlay').onclick = function() {
+        this.style.display = 'none';
+        container.style.backgroundImage = "url('IMG_2707.jpg')";
+        box.style.display = 'block';
+        bgm.play().catch(()=>{});
+        handleFlow();
+    };
+
+    function handleFlow() {
+        if (isInteractive || isTyping) return;
+        currentIndex++;
+        if (currentIndex < story.length) {
+            let line = story[currentIndex];
+            if (line.blackout) { container.style.backgroundImage = "none"; container.style.backgroundColor = "black"; }
+            else { container.style.backgroundImage = "url('IMG_2707.jpg')"; }
+            if (line.stopBGM) bgm.pause();
+            if (line.s) { sfx.src = line.s; sfx.play().catch(()=>{}); }
+            startTyping(line.n, line.t, line.shake);
+        } else {
+            startSceneTransition();
+        }
+    }
+
+    function startSceneTransition() {
+        box.style.display = "none";
+        let fCount = 0;
+        let flicker = setInterval(() => {
+            container.style.backgroundColor = (fCount % 2 === 0) ? "#222" : "#000";
+            fCount++;
+            if (fCount > 6) {
+                clearInterval(flicker);
+                executeLookUp();
+            }
+        }, 80);
+    }
+
+    function executeLookUp() {
+        bgm.currentTime = 0; bgm.volume = 0.4; bgm.play().catch(()=>{});
+        container.style.backgroundImage = "url('2034.jpg')";
+        container.style.backgroundPosition = "center 100%";
+        container.style.filter = "none"; 
+        
+        setTimeout(() => { 
+            container.style.backgroundPosition = "center 0%"; 
+            setTimeout(() => {
+                canvas.style.display = "block";
+                hook.style.display = "block";
+                isFlashlightOn = true;
+                drawFlashlight();
+            }, 4000);
+        }, 500);
+    }
+
+    function triggerJumpScare() {
+        eventTriggered = true;
+        sfx.src = "scream.mp3"; sfx.play().catch(()=>{});
+        let f = 0;
+        let flicker = setInterval(() => {
+            container.style.filter = (f % 2 === 0) ? "brightness(5) invert(1)" : "none";
+            f++;
+            if (f > 12) {
+                clearInterval(flicker);
+                container.style.filter = "none";
+                hook.classList.add('swaying');
+                creakSfx.play().catch(()=>{});
+                
+                setTimeout(() => {
+                    hook.style.transition = 'transform 2.5s cubic-bezier(0.22, 1, 0.36, 1)'; 
+                    hook.classList.remove('swaying');
+                    hook.style.transform = 'rotate(0deg)';
+                    setTimeout(() => {
+                        isInteractive = true;
+                        setupDrag();
+                    }, 1200); 
+                }, 5500); 
+            }
+        }, 40);
+    }
+
+    function showReaction(count) {
+        box.style.display = "block";
+        let text = (count === 1) ? "這到底是..？…" : (count === 2) ? "不想再碰了！RIP….." : "請讓他好好在這裏吧..";
+        if (count >= 4) {
+            startTyping("我", "<span class='scary-word'>我都說了不要再碰他了！！</span>");
+            triggerFinalScare();
+            return;
+        }
+        startTyping("我", text);
+    }
+
+    function triggerFinalScare() {
+        sfx.src = "scream.mp3"; sfx.play().catch(()=>{});
+        bgm.pause();
+        isFlashlightOn = false; canvas.style.display = "none";
+        let f = 0;
+        let flicker = setInterval(() => {
+            container.style.filter = (f % 2 === 0) ? "brightness(10) invert(1)" : "brightness(0)";
+            f++;
+            if (f > 20) { clearInterval(flicker); container.style.filter = "brightness(0)"; }
+        }, 40);
+    }
+
+    function setupDrag() {
+        let dragging = false, startX = 0;
+        const start = (e) => {
+            if (!isInteractive) return;
+            dragging = true;
+            startX = e.touches ? e.touches[0].clientX : e.clientX;
+            hook.style.transition = 'none';
+            box.style.display = "none";
+        };
+        const move = (e) => {
+            if (!dragging) return;
+            let currentX = e.touches ? e.touches[0].clientX : e.clientX;
+            let diff = currentX - startX;
+            let angle = Math.max(-35, Math.min(35, -(diff / 10)));
+            hook.style.transform = `rotate(${angle}deg)`;
+        };
+        const end = () => {
+            if (dragging) { 
+                dragging = false; 
+                hook.style.transition = 'transform 1.2s cubic-bezier(0.17, 0.89, 0.32, 1.49)';
+                hook.style.transform = 'rotate(0deg)';
+                creakSfx.currentTime = 0; creakSfx.play().catch(()=>{});
+                interactionCount++;
+                setTimeout(() => showReaction(interactionCount), 500);
+            }
+        };
+
+        hook.addEventListener('mousedown', start);
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', end);
+        
+        hook.addEventListener('touchstart', start);
+        window.addEventListener('touchmove', move);
+        window.addEventListener('touchend', end);
+    }
+</script>
+</body>
+</html>
